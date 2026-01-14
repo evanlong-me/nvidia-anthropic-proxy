@@ -222,6 +222,7 @@ async function handleStream(response, model) {
   let hasThinkingBlock = false;
   let hasTextBlock = false;
   let inThinkTag = false;
+  let modeDecided = false;
   let contentBuffer = '';
   const toolCalls = {};
 
@@ -255,36 +256,44 @@ async function handleStream(response, model) {
   };
 
   const processContent = (text) => {
+    // 模式已确定且不在 think 标签中，直接发送
+    if (modeDecided && !inThinkTag) {
+      sendText(text);
+      return;
+    }
+
     contentBuffer += text;
 
-    while (true) {
-      if (inThinkTag) {
-        const endIdx = contentBuffer.indexOf('</think>');
-        if (endIdx !== -1) {
-          sendThinking(contentBuffer.slice(0, endIdx));
-          contentBuffer = contentBuffer.slice(endIdx + 8);
-          inThinkTag = false;
-        } else if (contentBuffer.length > 8) {
-          sendThinking(contentBuffer.slice(0, -8));
-          contentBuffer = contentBuffer.slice(-8);
-          break;
-        } else {
-          break;
-        }
-      } else {
-        const startIdx = contentBuffer.indexOf('<think>');
-        if (startIdx !== -1) {
-          const before = contentBuffer.slice(0, startIdx);
-          if (before) sendText(before);
-          contentBuffer = contentBuffer.slice(startIdx + 7);
-          inThinkTag = true;
-        } else if (contentBuffer.length > 7) {
-          sendText(contentBuffer.slice(0, -7));
-          contentBuffer = contentBuffer.slice(-7);
-          break;
-        } else {
-          break;
-        }
+    // 首次判断：是否以 <think> 开头
+    if (!modeDecided && contentBuffer.length >= 7) {
+      if (contentBuffer.startsWith('<think>')) {
+        inThinkTag = true;
+        contentBuffer = contentBuffer.slice(7);
+      }
+      modeDecided = true;
+    }
+
+    // 还在等待判断
+    if (!modeDecided) return;
+
+    // 在 think 标签中
+    if (inThinkTag) {
+      const endIdx = contentBuffer.indexOf('</think>');
+      if (endIdx !== -1) {
+        sendThinking(contentBuffer.slice(0, endIdx));
+        const rest = contentBuffer.slice(endIdx + 8);
+        contentBuffer = '';
+        inThinkTag = false;
+        if (rest) sendText(rest);
+      } else if (contentBuffer.length > 8) {
+        sendThinking(contentBuffer.slice(0, -8));
+        contentBuffer = contentBuffer.slice(-8);
+      }
+    } else {
+      // 不在 think 标签中，直接发送全部缓冲内容
+      if (contentBuffer) {
+        sendText(contentBuffer);
+        contentBuffer = '';
       }
     }
   };
