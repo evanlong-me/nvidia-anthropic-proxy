@@ -107,14 +107,6 @@ npm run dev   # 启动本地服务器
 npm run tail  # 查看实时日志
 ```
 
-## API 端点
-
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/v1/messages` | POST | 消息对话 |
-| `/v1/models` | GET | 模型列表 |
-| `/health` | GET | 健康检查 |
-
 ## 许可证
 
 MIT
