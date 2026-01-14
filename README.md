@@ -107,6 +107,10 @@ npm run dev   # 启动本地服务器
 npm run tail  # 查看实时日志
 ```
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=evanlong-me/nvidia-anthropic-proxy&type=Date)](https://star-history.com/#evanlong-me/nvidia-anthropic-proxy&Date)
+
 ## 许可证
 
 MIT
