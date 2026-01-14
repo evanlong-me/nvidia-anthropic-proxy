@@ -21,9 +21,9 @@ npm run setup
 npm run deploy
 ```
 
-Setup 会提示输入：
-- **Cloudflare Account ID** - [Cloudflare Dashboard](https://dash.cloudflare.com) 右侧栏
-- **NVIDIA API Key** - [build.nvidia.com](https://build.nvidia.com)
+**准备工作：**
+- [NVIDIA API Key](https://build.nvidia.com) - 在 `npm run setup` 时输入
+- Cloudflare 账户 - 首次 `npm run deploy` 时会提示登录
 
 部署成功后会显示 Worker 地址：`https://nvidia-anthropic-proxy.xxx.workers.dev`
 

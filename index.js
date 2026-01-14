@@ -54,9 +54,20 @@ async function handleMessages(request, env) {
     }
 
     const messages = [];
-    if (body.system) messages.push({ role: 'system', content: body.system });
+    // Handle system prompt (can be string or array of TextBlocks)
+    if (body.system) {
+      const systemContent = typeof body.system === 'string'
+        ? body.system
+        : body.system.map(b => b.text).join('\n');
+      messages.push({ role: 'system', content: systemContent });
+    }
     for (const msg of body.messages) {
-      messages.push({ role: msg.role, content: convertContent(msg.content) });
+      const converted = convertMessage(msg);
+      if (Array.isArray(converted)) {
+        messages.push(...converted);
+      } else {
+        messages.push(converted);
+      }
     }
 
     const payload = {
@@ -68,6 +79,18 @@ async function handleMessages(request, env) {
     if (body.temperature !== undefined) payload.temperature = body.temperature;
     if (body.top_p !== undefined) payload.top_p = body.top_p;
     if (body.stop_sequences) payload.stop = body.stop_sequences;
+
+    // Convert Anthropic tools to OpenAI format
+    if (body.tools?.length) {
+      payload.tools = body.tools.map(tool => ({
+        type: 'function',
+        function: {
+          name: tool.name,
+          description: tool.description || '',
+          parameters: tool.input_schema || { type: 'object', properties: {} },
+        },
+      }));
+    }
 
     const res = await fetch(`${API_BASE}/chat/completions`, {
       method: 'POST',
@@ -84,13 +107,46 @@ async function handleMessages(request, env) {
 
     const data = await res.json();
     const choice = data.choices?.[0];
+    const message = choice?.message;
+
+    // Build response content
+    const content = [];
+
+    // Handle thinking/reasoning content (e.g., DeepSeek R1)
+    if (message?.reasoning_content) {
+      content.push({ type: 'thinking', thinking: message.reasoning_content });
+    }
+
+    if (message?.content) {
+      content.push({ type: 'text', text: message.content });
+    }
+
+    // Convert OpenAI tool_calls to Anthropic tool_use
+    if (message?.tool_calls?.length) {
+      for (const tc of message.tool_calls) {
+        content.push({
+          type: 'tool_use',
+          id: tc.id,
+          name: tc.function.name,
+          input: JSON.parse(tc.function.arguments || '{}'),
+        });
+      }
+    }
+
+    // Determine stop reason
+    let stop_reason = 'end_turn';
+    if (choice?.finish_reason === 'length') stop_reason = 'max_tokens';
+    if (choice?.finish_reason === 'tool_calls') stop_reason = 'tool_use';
+    if (message?.tool_calls?.length) stop_reason = 'tool_use';
+
     return json({
       id: data.id || `msg_${Date.now()}`,
       type: 'message',
       role: 'assistant',
-      content: [{ type: 'text', text: choice?.message?.content || '' }],
+      content: content.length ? content : [{ type: 'text', text: '' }],
       model: body.model,
-      stop_reason: choice?.finish_reason === 'length' ? 'max_tokens' : 'end_turn',
+      stop_reason,
+      stop_sequence: null,
       usage: {
         input_tokens: data.usage?.prompt_tokens || 0,
         output_tokens: data.usage?.completion_tokens || 0,
@@ -101,21 +157,82 @@ async function handleMessages(request, env) {
   }
 }
 
-function convertContent(content) {
-  if (typeof content === 'string') return content;
-  return content.map(block => {
-    if (block.type === 'text') return { type: 'text', text: block.text };
-    if (block.type === 'image') {
-      return { type: 'image_url', image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` } };
+// Convert Anthropic message to OpenAI format (may return array for tool_result)
+function convertMessage(msg) {
+  const content = msg.content;
+
+  // Simple string content
+  if (typeof content === 'string') {
+    return { role: msg.role, content };
+  }
+
+  // Array content - check for tool_use, tool_result, etc.
+  const textParts = [];
+  const toolCalls = [];
+  const toolResults = [];
+
+  for (const block of content) {
+    if (block.type === 'text') {
+      textParts.push(block.text);
+    } else if (block.type === 'tool_use') {
+      // Assistant's tool call
+      toolCalls.push({
+        id: block.id,
+        type: 'function',
+        function: {
+          name: block.name,
+          arguments: JSON.stringify(block.input || {}),
+        },
+      });
+    } else if (block.type === 'tool_result') {
+      // User's tool result
+      let resultContent = '';
+      if (typeof block.content === 'string') {
+        resultContent = block.content;
+      } else if (Array.isArray(block.content)) {
+        resultContent = block.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\n');
+      }
+      toolResults.push({
+        role: 'tool',
+        tool_call_id: block.tool_use_id,
+        content: resultContent,
+      });
+    } else if (block.type === 'image') {
+      textParts.push({ type: 'image_url', image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` } });
     }
-    return block;
-  });
+  }
+
+  // If message contains tool_results, return them as separate messages
+  if (toolResults.length > 0) {
+    return toolResults;
+  }
+
+  // If assistant message with tool_calls
+  if (msg.role === 'assistant' && toolCalls.length > 0) {
+    return {
+      role: 'assistant',
+      content: textParts.join('') || null,
+      tool_calls: toolCalls,
+    };
+  }
+
+  // Regular message with text/image content
+  if (textParts.every(p => typeof p === 'string')) {
+    return { role: msg.role, content: textParts.join('') };
+  }
+
+  // Mixed content (text + images)
+  return { role: msg.role, content: textParts };
 }
 
 function handleStream(response, model) {
   const id = `msg_${Date.now()}`;
   const enc = new TextEncoder();
   let tokens = 0;
+  let contentIndex = 0;
+  let hasThinkingBlock = false;
+  let hasTextBlock = false;
+  const toolCalls = {}; // Track tool calls by index
 
   const readable = new ReadableStream({
     async start(ctrl) {
@@ -123,9 +240,8 @@ function handleStream(response, model) {
 
       send('message_start', {
         type: 'message_start',
-        message: { id, type: 'message', role: 'assistant', content: [], model, stop_reason: null, usage: { input_tokens: 0, output_tokens: 0 } },
+        message: { id, type: 'message', role: 'assistant', content: [], model, stop_reason: null, stop_sequence: null, usage: { input_tokens: 0, output_tokens: 0 } },
       });
-      send('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } });
 
       const es = EventSource.from(response.body);
       es.onmessage = (e) => {
@@ -135,12 +251,81 @@ function handleStream(response, model) {
           const delta = parsed.choices?.[0]?.delta;
           const finish = parsed.choices?.[0]?.finish_reason;
 
-          if (delta?.content) {
-            send('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: delta.content } });
+          // Handle thinking/reasoning content (e.g., DeepSeek R1)
+          if (delta?.reasoning_content) {
+            if (!hasThinkingBlock) {
+              send('content_block_start', { type: 'content_block_start', index: contentIndex, content_block: { type: 'thinking', thinking: '' } });
+              hasThinkingBlock = true;
+            }
+            send('content_block_delta', { type: 'content_block_delta', index: contentIndex, delta: { type: 'thinking_delta', thinking: delta.reasoning_content } });
           }
+
+          // Handle text content
+          if (delta?.content) {
+            // Close thinking block if transitioning to text
+            if (hasThinkingBlock && !hasTextBlock) {
+              send('content_block_stop', { type: 'content_block_stop', index: contentIndex });
+              contentIndex++;
+              hasThinkingBlock = false;
+            }
+            if (!hasTextBlock) {
+              send('content_block_start', { type: 'content_block_start', index: contentIndex, content_block: { type: 'text', text: '' } });
+              hasTextBlock = true;
+            }
+            send('content_block_delta', { type: 'content_block_delta', index: contentIndex, delta: { type: 'text_delta', text: delta.content } });
+          }
+
+          // Handle tool calls
+          if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index;
+              if (!toolCalls[idx]) {
+                // Close text block if open
+                if (hasTextBlock) {
+                  send('content_block_stop', { type: 'content_block_stop', index: contentIndex });
+                  contentIndex++;
+                  hasTextBlock = false;
+                }
+                // Start new tool_use block
+                toolCalls[idx] = { id: tc.id, name: tc.function?.name || '', arguments: '' };
+                send('content_block_start', {
+                  type: 'content_block_start',
+                  index: contentIndex + idx,
+                  content_block: { type: 'tool_use', id: tc.id, name: tc.function?.name || '', input: {} },
+                });
+              }
+              if (tc.function?.name) toolCalls[idx].name = tc.function.name;
+              if (tc.function?.arguments) {
+                toolCalls[idx].arguments += tc.function.arguments;
+                send('content_block_delta', {
+                  type: 'content_block_delta',
+                  index: contentIndex + idx,
+                  delta: { type: 'input_json_delta', partial_json: tc.function.arguments },
+                });
+              }
+            }
+          }
+
           if (finish) {
-            send('content_block_stop', { type: 'content_block_stop', index: 0 });
-            send('message_delta', { type: 'message_delta', delta: { stop_reason: finish === 'length' ? 'max_tokens' : 'end_turn' }, usage: { output_tokens: tokens } });
+            // Close any open blocks
+            if (hasThinkingBlock) {
+              send('content_block_stop', { type: 'content_block_stop', index: contentIndex });
+              contentIndex++;
+            }
+            if (hasTextBlock) {
+              send('content_block_stop', { type: 'content_block_stop', index: contentIndex });
+              contentIndex++;
+            }
+            for (const idx of Object.keys(toolCalls)) {
+              send('content_block_stop', { type: 'content_block_stop', index: contentIndex + parseInt(idx) });
+            }
+
+            // Determine stop reason
+            let stop_reason = 'end_turn';
+            if (finish === 'length') stop_reason = 'max_tokens';
+            if (finish === 'tool_calls' || Object.keys(toolCalls).length > 0) stop_reason = 'tool_use';
+
+            send('message_delta', { type: 'message_delta', delta: { stop_reason }, usage: { output_tokens: tokens } });
             send('message_stop', { type: 'message_stop' });
             ctrl.close();
           }

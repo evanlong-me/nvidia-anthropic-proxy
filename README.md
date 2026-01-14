@@ -21,9 +21,9 @@ npm run setup
 npm run deploy
 ```
 
-Setup will prompt for:
-- **Cloudflare Account ID** - Found in [Cloudflare Dashboard](https://dash.cloudflare.com) sidebar
-- **NVIDIA API Key** - Get it from [build.nvidia.com](https://build.nvidia.com)
+**Prerequisites:**
+- [NVIDIA API Key](https://build.nvidia.com) - Required during `npm run setup`
+- Cloudflare account - Will prompt to login during first `npm run deploy`
 
 After deployment, you'll get a Worker URL: `https://nvidia-anthropic-proxy.xxx.workers.dev`
 
