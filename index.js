@@ -1,5 +1,17 @@
 const API_BASE = 'https://integrate.api.nvidia.com/v1';
 
+const MODEL_PREFIX_MAP = [
+  ['claude-opus-4', 'minimaxai/minimax-m2.1'],
+  ['claude-sonnet-4', 'z-ai/glm4.7'],
+];
+
+function mapModel(model) {
+  for (const [prefix, target] of MODEL_PREFIX_MAP) {
+    if (model.startsWith(prefix)) return target;
+  }
+  return model;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -25,7 +37,7 @@ export default {
       return handleMessages(request, env);
     }
     if (url.pathname === '/v1/models' && request.method === 'GET') {
-      return handleModels(env);
+      return handleModels();
     }
     if (url.pathname === '/health' || url.pathname === '/') {
       return json({ status: 'ok' });
@@ -42,30 +54,14 @@ function json(data, status = 200) {
   });
 }
 
-async function handleModels(env) {
-  try {
-    const res = await fetch(`${API_BASE}/models`, {
-      headers: { 'Authorization': `Bearer ${env.NVIDIA_API_KEY}` },
-    });
-    if (!res.ok) return json({ error: { type: 'api_error', message: await res.text() } }, res.status);
-
-    const data = await res.json();
-    const models = (data.data || []).map(m => ({
-      id: m.id,
-      type: 'model',
-      display_name: m.id,
-      created_at: m.created ? new Date(m.created * 1000).toISOString() : '1970-01-01T00:00:00Z',
-    }));
-
-    return json({
-      data: models,
-      has_more: false,
-      first_id: models[0]?.id || null,
-      last_id: models.at(-1)?.id || null,
-    });
-  } catch (err) {
-    return json({ error: { type: 'internal_error', message: err.message } }, 500);
-  }
+function handleModels() {
+  const models = MODEL_PREFIX_MAP.map(([prefix]) => ({
+    id: prefix,
+    type: 'model',
+    display_name: prefix,
+    created_at: '2024-01-01T00:00:00Z',
+  }));
+  return json({ data: models, has_more: false, first_id: models[0].id, last_id: models.at(-1).id });
 }
 
 async function handleMessages(request, env) {
@@ -75,6 +71,8 @@ async function handleMessages(request, env) {
       return json({ error: { type: 'invalid_request_error', message: 'model is required' } }, 400);
     }
 
+    const nvidiaModel = mapModel(body.model);
+
     const messages = [];
     if (body.system) messages.push({ role: 'system', content: body.system });
     for (const msg of body.messages) {
@@ -82,7 +80,7 @@ async function handleMessages(request, env) {
     }
 
     const payload = {
-      model: body.model,
+      model: nvidiaModel,
       messages,
       max_tokens: body.max_tokens,
       stream: !!body.stream,
