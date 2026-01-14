@@ -1,16 +1,18 @@
 # NVIDIA Anthropic Proxy
 
-Cloudflare Worker 代理，让 Claude Code 使用 NVIDIA NIM API 的模型。
+[中文文档](README_CN.md)
 
-## 特性
+A Cloudflare Worker proxy that enables Claude Code to use NVIDIA NIM API models.
 
-- 在 Claude Code 中使用 NVIDIA NIM 的开源模型（Llama、Minimax、GLM 等）
-- 保持 Claude Code 完整体验，无缝切换模型
-- 利用 Cloudflare 全球边缘网络，低延迟访问
+## Features
 
-## 快速开始
+- Use NVIDIA NIM open-source models (Llama, Minimax, GLM, etc.) in Claude Code
+- Seamless model switching with full Claude Code experience
+- Low-latency access via Cloudflare's global edge network
 
-### 1. 部署代理
+## Quick Start
+
+### 1. Deploy the Proxy
 
 ```bash
 git clone https://github.com/evanlong-me/nvidia-anthropic-proxy.git
@@ -19,15 +21,15 @@ npm run setup
 npm run deploy
 ```
 
-Setup 会提示输入：
-- **Cloudflare Account ID** - [Cloudflare Dashboard](https://dash.cloudflare.com) 右侧栏
-- **NVIDIA API Key** - [build.nvidia.com](https://build.nvidia.com)
+Setup will prompt for:
+- **Cloudflare Account ID** - Found in [Cloudflare Dashboard](https://dash.cloudflare.com) sidebar
+- **NVIDIA API Key** - Get it from [build.nvidia.com](https://build.nvidia.com)
 
-部署成功后会显示 Worker 地址：`https://nvidia-anthropic-proxy.xxx.workers.dev`
+After deployment, you'll get a Worker URL: `https://nvidia-anthropic-proxy.xxx.workers.dev`
 
-### 2. 配置 Claude Code
+### 2. Configure Claude Code
 
-编辑 `~/.claude/settings.json`：
+Edit `~/.claude/settings.json`:
 
 ```json
 {
@@ -40,7 +42,7 @@ Setup 会提示输入：
 }
 ```
 
-### 3. 开始使用
+### 3. Start Using
 
 ```bash
 claude
@@ -50,44 +52,44 @@ claude
 - `/model sonnet` → minimaxai/minimax-m2.1
 - `/model haiku` → z-ai/glm4.7
 
-## 支持的模型
+## Supported Models
 
-代理透传模式，支持 NVIDIA NIM 所有模型：
+The proxy uses pass-through mode, supporting all NVIDIA NIM models:
 
-| 模型 | 说明 |
-|------|------|
-| `minimaxai/minimax-m2.1` | Minimax 最新模型，中文能力强 |
-| `z-ai/glm4.7` | 智谱 GLM4，快速响应 |
+| Model | Description |
+|-------|-------------|
+| `minimaxai/minimax-m2.1` | Minimax latest, strong Chinese capability |
+| `z-ai/glm4.7` | Zhipu GLM4, fast response |
 | `meta/llama-3.3-70b-instruct` | Meta Llama 3.3 70B |
 | `meta/llama-3.1-405b-instruct` | Meta Llama 3.1 405B |
-| `deepseek-ai/deepseek-r1` | DeepSeek R1 推理模型 |
-| `qwen/qwen2.5-72b-instruct` | 阿里通义千问 2.5 |
+| `deepseek-ai/deepseek-r1` | DeepSeek R1 reasoning model |
+| `qwen/qwen2.5-72b-instruct` | Alibaba Qwen 2.5 |
 
-完整列表：[build.nvidia.com/models](https://build.nvidia.com/models)
+Full list: [build.nvidia.com/models](https://build.nvidia.com/models)
 
-## 工作原理
+## How It Works
 
 ```
-Claude Code (Anthropic 格式)
+Claude Code (Anthropic format)
     ↓
-本代理 (Cloudflare Worker)
+This Proxy (Cloudflare Worker)
     ↓
-格式转换 (Anthropic → OpenAI)
+Format Conversion (Anthropic → OpenAI)
     ↓
 NVIDIA NIM API
 ```
 
-## 本地开发
+## Local Development
 
 ```bash
-npm run dev   # 启动本地服务器
-npm run tail  # 查看实时日志
+npm run dev   # Start local server
+npm run tail  # View real-time logs
 ```
 
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=evanlong-me/nvidia-anthropic-proxy&type=Date)](https://star-history.com/#evanlong-me/nvidia-anthropic-proxy&Date)
 
-## 许可证
+## License
 
 MIT
