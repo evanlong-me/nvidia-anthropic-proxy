@@ -35,9 +35,16 @@ Claude Code (Anthropic 格式)
 git clone https://github.com/你的用户名/nvidia-anthropic-proxy.git
 cd nvidia-anthropic-proxy
 
-# 安装依赖并配置（按提示输入 Cloudflare Account ID 和 NVIDIA API Key）
+# 安装依赖并配置
 npm run setup
+```
 
+Setup 会提示你输入：
+- **Cloudflare Account ID** - 在 [Cloudflare Dashboard](https://dash.cloudflare.com) 右侧栏查看
+- **NVIDIA API Key** - 在 [build.nvidia.com](https://build.nvidia.com) 获取
+- **AUTH_TOKEN**（可选）- 自定义密码，保护代理
+
+```bash
 # 部署到 Cloudflare
 npm run deploy
 ```
