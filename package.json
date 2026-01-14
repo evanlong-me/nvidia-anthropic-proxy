@@ -4,11 +4,12 @@
   "description": "Anthropic API compatible proxy for Nvidia API",
   "main": "index.js",
   "scripts": {
+    "setup": "./setup.sh",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },
   "devDependencies": {
-    "wrangler": "^3.24.0"
+    "wrangler": "latest"
   }
 }
