@@ -136,17 +136,18 @@ function convertToAnthropic(data, model) {
 
 function handleStream(response, model) {
   const messageId = `msg_${Date.now()}`;
+  const encoder = new TextEncoder();
   let outputTokens = 0;
+
+  const enqueue = (controller, str) => controller.enqueue(encoder.encode(str));
 
   const stream = new TransformStream({
     start(controller) {
-      // message_start
-      controller.enqueue(`event: message_start\ndata: ${JSON.stringify({
+      enqueue(controller, `event: message_start\ndata: ${JSON.stringify({
         type: 'message_start',
         message: { id: messageId, type: 'message', role: 'assistant', content: [], model, stop_reason: null, stop_sequence: null, usage: { input_tokens: 0, output_tokens: 0 } },
       })}\n\n`);
-      // content_block_start
-      controller.enqueue(`event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })}\n\n`);
+      enqueue(controller, `event: content_block_start\ndata: ${JSON.stringify({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })}\n\n`);
     },
     transform(chunk, controller) {
       const text = new TextDecoder().decode(chunk);
@@ -160,16 +161,16 @@ function handleStream(response, model) {
           const finishReason = parsed.choices?.[0]?.finish_reason;
 
           if (delta?.content) {
-            controller.enqueue(`event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: delta.content } })}\n\n`);
+            enqueue(controller, `event: content_block_delta\ndata: ${JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: delta.content } })}\n\n`);
           }
 
           if (finishReason) {
             let stopReason = 'end_turn';
             if (finishReason === 'length') stopReason = 'max_tokens';
 
-            controller.enqueue(`event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: 0 })}\n\n`);
-            controller.enqueue(`event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: stopReason, stop_sequence: null }, usage: { output_tokens: outputTokens } })}\n\n`);
-            controller.enqueue(`event: message_stop\ndata: ${JSON.stringify({ type: 'message_stop' })}\n\n`);
+            enqueue(controller, `event: content_block_stop\ndata: ${JSON.stringify({ type: 'content_block_stop', index: 0 })}\n\n`);
+            enqueue(controller, `event: message_delta\ndata: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: stopReason, stop_sequence: null }, usage: { output_tokens: outputTokens } })}\n\n`);
+            enqueue(controller, `event: message_stop\ndata: ${JSON.stringify({ type: 'message_stop' })}\n\n`);
           }
 
           if (parsed.usage) {
