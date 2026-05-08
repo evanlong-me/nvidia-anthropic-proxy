@@ -15,6 +15,14 @@ npm install
 
 echo
 
+# 确保已登录 Cloudflare：pipe 给 wrangler 会让 stdin 变成非交互式，
+# 此时若未登录就会强制要 CLOUDFLARE_API_TOKEN，所以先在这里登录
+if ! npx wrangler whoami >/dev/null 2>&1; then
+    echo "Cloudflare not logged in. Opening browser to login..."
+    npx wrangler login
+    echo
+fi
+
 # 配置 NVIDIA_API_KEY
 echo "Enter your NVIDIA API Key:"
 read -s NVIDIA_KEY
