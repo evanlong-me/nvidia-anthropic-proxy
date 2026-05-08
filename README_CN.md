@@ -23,7 +23,7 @@ npm run deploy
 
 **准备工作：**
 - [NVIDIA API Key](https://build.nvidia.com) - 在 `npm run setup` 时输入
-- Cloudflare 账户 - 首次 `npm run deploy` 时会提示登录
+- Cloudflare 账户 - 首次 `npm run setup` 时会提示登录（或设置 `CLOUDFLARE_API_TOKEN` 环境变量以非交互方式使用）
 
 部署成功后会显示 Worker 地址：`https://nvidia-anthropic-proxy.xxx.workers.dev`
 
