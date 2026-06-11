@@ -10,6 +10,8 @@ Cloudflare Worker 代理，让 Claude Code 使用 NVIDIA NIM API 的模型。
 
 ![Demo](public/demo.webp)
 
+> **注意：** 本项目不提供公共托管服务。请按下面的步骤自行部署（约一分钟），NVIDIA API Key 只保存在你自己的 Cloudflare 账户中。
+
 ## 快速开始
 
 ### 1. 部署代理

@@ -10,6 +10,8 @@ A Cloudflare Worker proxy that enables Claude Code to use NVIDIA NIM API models.
 
 ![Demo](public/demo.webp)
 
+> **Note:** There is no public hosted instance. Deploy your own Worker with the steps below — it takes about a minute, and your NVIDIA API key stays in your own Cloudflare account.
+
 ## Quick Start
 
 ### 1. Deploy the Proxy
