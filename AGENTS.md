@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agents when working with code in this repository.
 
 ## 项目概述
 
@@ -26,7 +26,7 @@ npm run deploy   # 部署到 Cloudflare
 
 - `NVIDIA_API_KEY` - 必需
 
-## Claude Code 配置
+## coding agents 配置
 
 `~/.claude/settings.json`:
 
